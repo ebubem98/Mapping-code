@@ -18,6 +18,9 @@ Storing MT percentage in object meta data
 ```{r}
 pbmc <- PercentageFeatureSet(pbmc, pattern = "^MT-", col.name = "percent.mt")
 head(pbmc)
+
+SCT 
+pbmc <- SCTransform(pbmc, vars.to.regress = "percent.mt", verbose = FALSE)
 ```
 SPCA (Gave a total of 21 principal components)
 pbmc <- RunPCA(pbmc, verbose = FALSE)
