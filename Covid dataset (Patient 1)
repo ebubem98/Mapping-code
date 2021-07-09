@@ -1,0 +1,79 @@
+library(Seurat)
+library(ggplot2)
+library(sctransform)
+library(SeuratObject)
+(Loading seurat, seuratobject, and sctrancform)
+
+Loading in my dataset
+pbmc.data <- readRDS("~/covid/GSM4557327_555_1_cell.counts.matrices.rds")
+pbmc.data
+class(pbmc.data$exon)
+
+Making Seurat object with the exon sparse matrix
+pbmc <- CreateSeuratObject(counts = pbmc.data$exon)
+class(pbmc)
+dim(pbmc)
+
+Storing MT percentage in object meta data
+```{r}
+pbmc <- PercentageFeatureSet(pbmc, pattern = "^MT-", col.name = "percent.mt")
+head(pbmc)
+```
+SPCA (Gave a total of 21 principal components)
+pbmc <- RunPCA(pbmc, verbose = FALSE)
+
+Running UMAP reduction
+pbmc <- RunUMAP(pbmc, dims = 1:21, verbose = FALSE)
+
+
+pbmc <- FindNeighbors(pbmc, dims = 1:21, verbose = FALSE )
+pbmc <- FindClusters(pbmc, verbose = FALSE)
+
+UMAP embedding 
+DimPlot(pbmc, label = TRUE) + NoLegend()
+
+FeaturePlot(pbmc, features = c("CD3D", "ISG15", "TCL1A", "FCER2", "XCL1", "FCGR3A"), pt.size = 0.2,
+    ncol = 3)
+
+Mapping, loading, and plotting PBMC reference dataset
+library(Seurat)
+library(SeuratDisk)
+library(ggplot2)
+library(patchwork)
+reference <- LoadH5Seurat(file = "~/pbmc_multimodal.h5seurat")
+DimPlot(object = reference, reduction = "wnn.umap", group.by = "celltype.l2", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+
+Finding anchors
+anchors <- FindTransferAnchors(reference = reference, query = pbmc, normalization.method = "SCT", reference.reduction = "spca", dims = 1:50)
+
+pbmc <- MapQuery(
+  anchorset = anchors,
+  query = pbmc,
+  reference = reference,
+  refdata = list(
+    celltype.l1 = "celltype.l1",
+    celltype.l2 = "celltype.l2",
+    predicted_ADT = "ADT"
+  ),
+  reference.reduction = "spca", 
+  reduction.model = "wnn.umap"
+  
+UMAP plots of prediction
+p1 = DimPlot(pbmc, reduction = "ref.umap", group.by = "predicted.celltype.l1", label = TRUE, label.size = 3, repel = TRUE) + NoLegend()
+p2 = DimPlot(pbmc, reduction = "ref.umap", group.by = "predicted.celltype.l2", label = TRUE, label.size = 3 ,repel = TRUE) + NoLegend()
+p1 + p2
+
+Merging reference and query
+#merge reference and query
+reference$id <- 'reference'
+pbmc$id <- 'query'
+refquery <- merge(reference, pbmc)
+refquery[["spca"]] <- merge(reference[["spca"]], pbmc[["ref.spca"]])
+refquery <- RunUMAP(refquery, reduction = 'spca', dims = 1:50)
+DimPlot(refquery, group.by = 'id', shuffle = TRUE)
+
+Finding Neutrophil markers
+FeaturePlot(pbmc, features = c("DEF3A", "ELANE", "MPO", "MMP8", "MMP9", "CAMP"))
+
+
+
